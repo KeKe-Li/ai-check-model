@@ -5,6 +5,12 @@ import type { VerificationConfig, DetectionEvent, VerificationReport } from '@/l
 export const runtime = 'nodejs'
 export const maxDuration = 300  // 5 分钟最大执行时间
 
+interface LeaderboardModelRecord {
+  model: string
+  score: number
+  checkedAt: string
+}
+
 /**
  * GET /api/verify/[jobId]/stream
  *
@@ -92,7 +98,8 @@ export async function GET(
 async function saveResults(config: VerificationConfig, report: VerificationReport) {
   try {
     const { db } = await import('@/lib/db')
-    const { verificationJobs, detectionResults } = await import('@/lib/db/schema')
+    const { verificationJobs, detectionResults, leaderboardEntries } = await import('@/lib/db/schema')
+    const { and, desc, eq } = await import('drizzle-orm')
 
     // 从端点 URL 提取域名
     let domain = ''
@@ -128,8 +135,89 @@ async function saveResults(config: VerificationConfig, report: VerificationRepor
         findings: result.findings,
       })
     }
+
+    const jobs = await db.select()
+      .from(verificationJobs)
+      .where(and(
+        eq(verificationJobs.endpointDomain, domain),
+        eq(verificationJobs.status, 'completed')
+      ))
+      .orderBy(desc(verificationJobs.completedAt), desc(verificationJobs.createdAt))
+
+    const totalChecks = jobs.length
+    const scoredJobs = jobs.filter((job) => typeof job.totalScore === 'number')
+    const avgScore = scoredJobs.length > 0
+      ? Number(
+          (
+            scoredJobs.reduce((sum, job) => sum + (job.totalScore ?? 0), 0) / scoredJobs.length
+          ).toFixed(2)
+        )
+      : null
+
+    const modelsVerified = buildModelsVerified(jobs)
+    const lastCheckedAt = jobs[0]?.completedAt ?? jobs[0]?.createdAt ?? new Date()
+    const overallStatus = getLeaderboardStatus(avgScore)
+
+    const existingEntry = await db.select()
+      .from(leaderboardEntries)
+      .where(eq(leaderboardEntries.endpointDomain, domain))
+      .limit(1)
+
+    if (existingEntry.length > 0) {
+      await db.update(leaderboardEntries)
+        .set({
+          totalChecks,
+          avgScore: avgScore === null ? null : String(avgScore),
+          lastCheckedAt,
+          modelsVerified,
+          overallStatus,
+          updatedAt: new Date(),
+        })
+        .where(eq(leaderboardEntries.endpointDomain, domain))
+    } else {
+      await db.insert(leaderboardEntries).values({
+        endpointDomain: domain,
+        totalChecks,
+        avgScore: avgScore === null ? null : String(avgScore),
+        lastCheckedAt,
+        modelsVerified,
+        overallStatus,
+      })
+    }
   } catch (error) {
     // 数据库可能未配置，静默失败
     console.error('数据库保存失败:', error)
   }
+}
+
+function buildModelsVerified(
+  jobs: Array<{
+    modelClaimed: string
+    totalScore: number | null
+    completedAt: Date | null
+    createdAt: Date
+  }>
+): LeaderboardModelRecord[] {
+  const latestByModel = new Map<string, LeaderboardModelRecord>()
+
+  for (const job of jobs) {
+    if (latestByModel.has(job.modelClaimed)) {
+      continue
+    }
+
+    latestByModel.set(job.modelClaimed, {
+      model: job.modelClaimed,
+      score: job.totalScore ?? 0,
+      checkedAt: (job.completedAt ?? job.createdAt).toISOString(),
+    })
+  }
+
+  return Array.from(latestByModel.values()).slice(0, 10)
+}
+
+function getLeaderboardStatus(avgScore: number | null): 'verified' | 'suspicious' | 'fake' | null {
+  if (avgScore === null) return null
+  if (avgScore >= 60) return 'verified'
+  if (avgScore >= 35) return 'suspicious'
+  return 'fake'
 }

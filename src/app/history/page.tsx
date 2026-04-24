@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -85,7 +85,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchHistory = useCallback(async (page: number, model: string) => {
+  async function fetchHistory(page: number, model: string) {
     setLoading(true)
     setError(null)
     try {
@@ -106,11 +106,17 @@ export default function HistoryPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }
 
   useEffect(() => {
-    fetchHistory(1, modelFilter)
-  }, [fetchHistory, modelFilter])
+    const timeoutId = window.setTimeout(() => {
+      void fetchHistory(1, modelFilter)
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [modelFilter])
 
   const handlePageChange = (newPage: number) => {
     fetchHistory(newPage, modelFilter)

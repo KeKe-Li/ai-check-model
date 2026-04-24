@@ -68,10 +68,16 @@ export default function DetailedReport({ results }: DetailedReportProps) {
 
   // 获取分数徽章颜色
   const getScoreBadgeVariant = (score: number, maxScore: number) => {
+    if (maxScore === 0) return 'outline'
     const percentage = (score / maxScore) * 100
     if (percentage >= 80) return 'default'
     if (percentage >= 50) return 'secondary'
     return 'destructive'
+  }
+
+  const getScoreBadgeText = (score: number, maxScore: number) => {
+    if (maxScore === 0) return '跳过'
+    return `${score}/${maxScore}`
   }
 
   return (
@@ -80,7 +86,7 @@ export default function DetailedReport({ results }: DetailedReportProps) {
         <CardTitle>检测详情</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {results.map((result, index) => {
+        {results.map((result) => {
           const isExpanded = expandedDetectors.has(result.detectorName)
 
           return (
@@ -94,7 +100,7 @@ export default function DetailedReport({ results }: DetailedReportProps) {
                   {getStatusIcon(result.status)}
                   <span className="font-medium flex-1">{result.displayName}</span>
                   <Badge variant={getScoreBadgeVariant(result.score, result.maxScore)}>
-                    {result.score}/{result.maxScore}
+                    {getScoreBadgeText(result.score, result.maxScore)}
                   </Badge>
                   {getStatusBadge(result.status)}
                   <motion.div

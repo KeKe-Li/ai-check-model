@@ -76,7 +76,7 @@ export class DetectionOrchestrator {
       }
 
       try {
-        const result = await detector.detect(config, (message) => {
+        const result = await detector.detect(config, () => {
           // 进度回调 - 检测器可以通过此回调报告内部进度
           // 如需实时反馈，可扩展为 yield { type: 'detector:progress', message }
         })

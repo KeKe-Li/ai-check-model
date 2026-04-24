@@ -72,6 +72,14 @@ export default function ProgressStream({
 
   // 获取分数徽章
   const getScoreBadge = (result: DetectorResult) => {
+    if (result.status === 'skip' || result.maxScore === 0) {
+      return (
+        <Badge variant="outline" className="ml-auto">
+          跳过
+        </Badge>
+      )
+    }
+
     const percentage = (result.score / result.maxScore) * 100
     let variant: 'default' | 'secondary' | 'destructive' | 'outline' = 'default'
 
