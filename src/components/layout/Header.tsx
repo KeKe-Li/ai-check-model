@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Shield, Sun, Moon, Menu, X } from 'lucide-react'
+import { Shield, Sun, Moon, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -12,19 +12,20 @@ import {
 } from '@/components/ui/sheet'
 
 export default function Header() {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
-  const [mounted, setMounted] = useState(false)
+  const [theme, setTheme] = useState<'light' | 'dark' | null>(null)
 
   useEffect(() => {
-    setMounted(true)
     const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     const initialTheme = storedTheme || (prefersDark ? 'dark' : 'light')
-    setTheme(initialTheme)
+
+    queueMicrotask(() => {
+      setTheme(initialTheme)
+    })
   }, [])
 
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light'
+    const newTheme = theme === 'dark' ? 'light' : 'dark'
     setTheme(newTheme)
     localStorage.setItem('theme', newTheme)
     document.documentElement.classList.toggle('dark', newTheme === 'dark')
@@ -67,7 +68,7 @@ export default function Header() {
             className="hidden md:inline-flex"
             aria-label="切换主题"
           >
-            {mounted && theme === 'light' ? (
+            {theme === 'light' ? (
               <Sun className="h-5 w-5" />
             ) : (
               <Moon className="h-5 w-5" />
@@ -93,7 +94,7 @@ export default function Header() {
                     onClick={toggleTheme}
                     className="w-full justify-start"
                   >
-                    {mounted && theme === 'light' ? (
+                    {theme === 'light' ? (
                       <>
                         <Sun className="h-4 w-4 mr-2" />
                         <span>浅色模式</span>

@@ -6,7 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "docker:build": "docker build -t ai-check-model .",
+    "docker:run": "docker run -p 3000:3000 ai-check-model",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f app",
+    "docker:dev:up": "docker compose -f compose.dev.yaml up --build",
+    "docker:dev:down": "docker compose -f compose.dev.yaml down",
+    "docker:dev:logs": "docker compose -f compose.dev.yaml logs -f app"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
