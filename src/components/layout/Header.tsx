@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Shield, Sun, Moon, Menu, X } from 'lucide-react'
+import { Shield, Sun, Moon, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -16,11 +16,15 @@ export default function Header() {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
     const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     const initialTheme = storedTheme || (prefersDark ? 'dark' : 'light')
-    setTheme(initialTheme)
+    const timer = window.setTimeout(() => {
+      setTheme(initialTheme)
+      setMounted(true)
+    }, 0)
+
+    return () => window.clearTimeout(timer)
   }, [])
 
   const toggleTheme = () => {

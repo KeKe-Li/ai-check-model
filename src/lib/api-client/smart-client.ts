@@ -21,6 +21,12 @@ export interface SmartSendParams {
   temperature?: number
   stream?: boolean
   thinking?: { type: string; budget_tokens: number }
+  /** OpenAI 兼容接口专用：返回 token 级概率 */
+  logprobs?: boolean
+  /** OpenAI 兼容接口专用：每个 token 返回的候选概率数量 */
+  top_logprobs?: number
+  /** OpenAI 兼容接口专用：尽量固定采样路径，便于指纹探针复测 */
+  seed?: number
 }
 
 export interface SmartResponse {
@@ -37,7 +43,13 @@ export interface SmartResponse {
   /** 思考内容（如果有） */
   thinkingText: string | null
   /** 思考块列表（Claude 原生格式） */
-  thinkingBlocks: Array<{ type: string; thinking?: string; text?: string }> | null
+  thinkingBlocks: Array<{
+    type: string
+    thinking?: string
+    text?: string
+    signature?: string
+    data?: string
+  }> | null
   /** 原始 fetch Response 对象（用于流式 TTFB 测量等场景） */
   raw: Response
 }
@@ -159,16 +171,24 @@ export class SmartClient {
     })
 
     const body = (response.body ?? {}) as Record<string, unknown>
-    const content = body.content as Array<{ type: string; text?: string; thinking?: string }> | undefined
+    const content = body.content as Array<{
+      type: string
+      text?: string
+      thinking?: string
+      signature?: string
+      data?: string
+    }> | undefined
 
     // 提取文本
     const textBlocks = content?.filter(b => b.type === 'text') ?? []
     const text = textBlocks.map(b => b.text ?? '').join('\n')
 
     // 提取思考内容
-    const thinkingBlocks = content?.filter(b => b.type === 'thinking') ?? null
+    const thinkingBlocks = content?.filter(b =>
+      b.type === 'thinking' || b.type === 'redacted_thinking'
+    ) ?? null
     const thinkingText = thinkingBlocks && thinkingBlocks.length > 0
-      ? thinkingBlocks.map(b => b.thinking ?? b.text ?? '').join('\n')
+      ? thinkingBlocks.map(b => b.thinking ?? b.text ?? b.data ?? '').join('\n')
       : null
 
     return {
@@ -199,6 +219,9 @@ export class SmartClient {
       max_tokens: params.max_tokens,
       temperature: params.temperature,
       stream: params.stream,
+      logprobs: params.logprobs,
+      top_logprobs: params.top_logprobs,
+      seed: params.seed,
     })
 
     const body = (response.body ?? {}) as Record<string, unknown>

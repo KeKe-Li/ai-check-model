@@ -2,6 +2,7 @@ import { BaseDetector } from './base'
 import type { DetectorResult, VerificationConfig } from '../types'
 import { getProviderFromModel } from '../types'
 import { SmartClient } from '@/lib/api-client/smart-client'
+import { analyzeProviderMetadata } from '../authenticity-signals'
 
 /**
  * 元数据检测器
@@ -41,6 +42,12 @@ export class MetadataDetector extends BaseDetector {
 
       const body = response.body
       const headers = response.headers
+      const authenticitySignals = analyzeProviderMetadata({
+        claimedModel: config.model,
+        apiFormat: response.format,
+        body,
+        headers,
+      })
 
       if (response.format === 'anthropic') {
         // Anthropic 格式响应结构检查
@@ -55,9 +62,17 @@ export class MetadataDetector extends BaseDetector {
       }
 
       if (score >= this.maxScore * 0.8) {
-        return this.pass(score, findings, { provider, format: response.format })
+        return this.pass(score, findings, {
+          provider,
+          format: response.format,
+          authenticitySignals,
+        })
       }
-      return this.fail(score, findings, { provider, format: response.format })
+      return this.fail(score, findings, {
+        provider,
+        format: response.format,
+        authenticitySignals,
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       return this.skip(`元数据检测无法执行: ${message}`)

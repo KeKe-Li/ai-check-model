@@ -1,7 +1,6 @@
 'use client'
 
 import { use, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -17,54 +16,20 @@ interface PageProps {
 
 export default function VerifyPage({ params }: PageProps) {
   const { jobId } = use(params)
-  const searchParams = useSearchParams()
-
-  const endpoint = searchParams.get('endpoint')
-  const apiKey = searchParams.get('apiKey')
-  const model = searchParams.get('model')
 
   const { state, start, reset } = useVerificationStream()
 
   // 自动开始验证
   useEffect(() => {
-    if (endpoint && apiKey && model && state.status === 'idle') {
-      start({ jobId, endpoint, apiKey, model })
+    if (state.status === 'idle') {
+      start({ jobId })
     }
-  }, [endpoint, apiKey, model, jobId, state.status, start])
+  }, [jobId, state.status, start])
 
   // 处理重试
   const handleRetry = () => {
     reset()
-    if (endpoint && apiKey && model) {
-      start({ jobId, endpoint, apiKey, model })
-    }
-  }
-
-  // 检查参数完整性
-  if (!endpoint || !apiKey || !model) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-3xl mx-auto">
-          <Card className="shadow-lg border-destructive">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3 text-destructive mb-4">
-                <AlertCircle className="h-6 w-6" />
-                <h2 className="text-xl font-semibold">参数缺失</h2>
-              </div>
-              <p className="text-muted-foreground mb-4">
-                缺少必需的验证参数，请返回首页重新提交。
-              </p>
-              <Link href="/">
-                <Button>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  返回首页
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
+    start({ jobId })
   }
 
   return (

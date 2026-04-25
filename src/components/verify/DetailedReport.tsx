@@ -80,7 +80,7 @@ export default function DetailedReport({ results }: DetailedReportProps) {
         <CardTitle>检测详情</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {results.map((result, index) => {
+        {results.map((result) => {
           const isExpanded = expandedDetectors.has(result.detectorName)
 
           return (

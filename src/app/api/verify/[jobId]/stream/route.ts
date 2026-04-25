@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { DetectionOrchestrator } from '@/lib/detection/orchestrator'
 import type { VerificationConfig, DetectionEvent, VerificationReport } from '@/lib/detection/types'
+import { getVerificationJob } from '@/lib/verification/job-store'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300  // 5 分钟最大执行时间
@@ -10,10 +11,10 @@ export const maxDuration = 300  // 5 分钟最大执行时间
  *
  * 服务器发送事件 (SSE) 端点，实时推送检测进度
  *
- * 查询参数:
- * - endpoint: API 端点 URL
- * - apiKey: API 密钥
- * - model: 声称的模型名称
+ * 安全说明:
+ * - 仅从路径读取 jobId
+ * - endpoint/apiKey/model 从服务端临时任务读取
+ * - API Key 不进入 URL 查询参数
  *
  * SSE 事件类型:
  * - start: 检测开始
@@ -28,16 +29,16 @@ export async function GET(
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   const { jobId } = await params
-  const searchParams = request.nextUrl.searchParams
-  const endpoint = searchParams.get('endpoint')
-  const apiKey = searchParams.get('apiKey')
-  const model = searchParams.get('model')
+  // 读取 request.url，确保该 Route Handler 明确保持动态执行。
+  void request.url
 
-  if (!endpoint || !apiKey || !model) {
-    return new Response('缺少必需参数', { status: 400 })
+  const storedConfig = getVerificationJob(jobId)
+
+  if (!storedConfig) {
+    return new Response('验证任务不存在或已过期，请返回首页重新提交', { status: 404 })
   }
 
-  const config: VerificationConfig = { endpoint, apiKey, model, jobId }
+  const config: VerificationConfig = storedConfig
   const orchestrator = new DetectionOrchestrator()
 
   const stream = new ReadableStream({

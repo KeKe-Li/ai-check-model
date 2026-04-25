@@ -35,7 +35,7 @@ export async function GET(
         results,
       },
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: '查询失败，数据库可能未配置' },
       { status: 500 }

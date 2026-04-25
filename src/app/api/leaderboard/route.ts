@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
 /**
  * GET /api/leaderboard
@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
  * 响应:
  * - data: 排行榜条目列表
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const { db } = await import('@/lib/db')
     const { leaderboardEntries } = await import('@/lib/db/schema')

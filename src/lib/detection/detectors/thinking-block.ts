@@ -2,6 +2,7 @@ import { BaseDetector } from './base'
 import type { DetectorResult, VerificationConfig } from '../types'
 import { getModelInfo } from '../types'
 import { SmartClient } from '@/lib/api-client/smart-client'
+import { analyzeClaudeThinkingBlocks } from '../claude-thinking-analysis'
 
 /**
  * 思考块检测器
@@ -79,22 +80,14 @@ export class ThinkingBlockDetector extends BaseDetector {
       )
 
       if (response.thinkingBlocks && response.thinkingBlocks.length > 0) {
+        const analysis = analyzeClaudeThinkingBlocks(response.thinkingBlocks)
+        score += analysis.score
+        findings.push(...analysis.findings)
+
+        // 验证思考内容是否包含数学推理
         const thinkingText = response.thinkingBlocks
           .map((block) => block.thinking ?? block.text ?? '')
           .join('\n')
-
-        if (thinkingText.length > 50) {
-          score += 10
-          findings.push(`扩展思考验证通过: 返回了 ${response.thinkingBlocks.length} 个思考块（共 ${thinkingText.length} 字符）`)
-        } else if (thinkingText.length > 0) {
-          score += 5
-          findings.push(`扩展思考部分通过: 思考内容较短（${thinkingText.length} 字符），可能被截断`)
-        } else {
-          score += 2
-          findings.push('扩展思考块存在但内容为空')
-        }
-
-        // 验证思考内容是否包含数学推理
         if (thinkingText.includes('17') || thinkingText.includes('23') || thinkingText.includes('391')) {
           findings.push('思考内容包含相关数学推理过程')
         }

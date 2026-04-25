@@ -13,6 +13,38 @@ export interface DetectorResult {
 }
 
 /**
+ * 真实性证据强度
+ *
+ * - info: 仅作背景说明，不参与封顶
+ * - weak: 弱信号，单独不足以下结论
+ * - strong: 强信号，应该在最终报告中展示
+ * - critical: 关键疑点，会限制最高可信度
+ * - fatal: 致命矛盾，通常意味着“声称模型”和“实际来源”冲突
+ */
+export type AuthenticitySignalSeverity = 'info' | 'weak' | 'strong' | 'critical' | 'fatal'
+
+/**
+ * 真实性信号方向
+ *
+ * positive: 支持官方/真实模型
+ * negative: 指向套壳、转发篡改或模型不一致
+ * neutral: 仅描述兼容层、代理层等背景事实
+ */
+export type AuthenticitySignalPolarity = 'positive' | 'negative' | 'neutral'
+
+/**
+ * 单条真实性证据
+ * 用于把各检测器里的关键发现汇总到最终裁决。
+ */
+export interface AuthenticitySignal {
+  id: string
+  severity: AuthenticitySignalSeverity
+  message: string
+  polarity?: AuthenticitySignalPolarity
+  evidence?: Record<string, unknown>
+}
+
+/**
  * SSE 检测事件类型
  * 用于实时推送检测进度和结果
  */
@@ -38,6 +70,25 @@ export interface VerificationReport {
   modelDetected: string | null
   results: DetectorResult[]
   durationMs: number
+  /** 跨检测器汇总后的真实性评估 */
+  authenticity?: AuthenticityAssessment
+}
+
+/**
+ * 最终真实性评估
+ * 与 totalScore 并行展示，避免只看归一化分数造成误判。
+ */
+export interface AuthenticityAssessment {
+  verdict:
+    | 'likely_genuine'
+    | 'compatible_but_unverified'
+    | 'inconclusive'
+    | 'needs_review'
+    | 'suspicious'
+    | 'likely_fake'
+  summary: string[]
+  criticalSignals: AuthenticitySignal[]
+  scoreCapApplied?: number
 }
 
 /**
@@ -224,7 +275,12 @@ export function getProviderFromModel(modelId: string): ModelProvider {
   if (info) return info.provider
 
   if (modelId.startsWith('claude')) return 'anthropic'
-  if (modelId.startsWith('gpt') || modelId.startsWith('o1') || modelId.startsWith('o3')) return 'openai'
+  if (
+    modelId.startsWith('gpt') ||
+    modelId.startsWith('o1') ||
+    modelId.startsWith('o3') ||
+    modelId.startsWith('o4')
+  ) return 'openai'
   if (modelId.startsWith('gemini')) return 'gemini'
 
   return 'openai' // 默认 OpenAI 兼容
