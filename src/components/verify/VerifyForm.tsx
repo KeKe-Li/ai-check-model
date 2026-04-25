@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
@@ -40,7 +40,7 @@ export default function VerifyForm() {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -51,7 +51,7 @@ export default function VerifyForm() {
     },
   })
 
-  const modelValue = watch('model')
+  const modelValue = useWatch({ control, name: 'model' }) ?? ''
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true)
@@ -70,10 +70,14 @@ export default function VerifyForm() {
       }
 
       const result = await response.json()
+      const verifyData = result.data as { resultUrl: string }
 
-      // 构建带查询参数的 URL，用于 SSE 连接
-      const url = `/verify/${result.jobId}?endpoint=${encodeURIComponent(data.endpoint)}&apiKey=${encodeURIComponent(data.apiKey)}&model=${encodeURIComponent(data.model)}`
-      router.push(url)
+      if (!verifyData?.resultUrl) {
+        throw new Error('验证任务创建失败：响应缺少结果页地址')
+      }
+
+      // 只跳转 jobId 页面，API Key 保存在服务端临时任务中，不进入 URL。
+      router.push(verifyData.resultUrl)
     } catch (error) {
       console.error('提交失败:', error)
       alert(error instanceof Error ? error.message : '提交失败,请重试')

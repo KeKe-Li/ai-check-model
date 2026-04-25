@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { v4 as uuidv4 } from 'uuid'
 import { verifyInputSchema } from '@/lib/validators/verify-input'
+import { createVerificationJob } from '@/lib/verification/job-store'
 
 /**
  * POST /api/verify
@@ -15,6 +15,7 @@ import { verifyInputSchema } from '@/lib/validators/verify-input'
  * 响应:
  * - jobId: 任务唯一标识符
  * - streamUrl: SSE 流式接口 URL
+ * - resultUrl: 前端结果页 URL
  */
 export async function POST(request: NextRequest) {
   try {
@@ -28,14 +29,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const jobId = uuidv4()
+    const job = createVerificationJob(result.data)
 
     return NextResponse.json({
       success: true,
-      data: {
-        jobId,
-        streamUrl: `/api/verify/${jobId}/stream`,
-      },
+      data: job,
     })
   } catch {
     return NextResponse.json(

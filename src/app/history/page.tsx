@@ -109,7 +109,11 @@ export default function HistoryPage() {
   }, [])
 
   useEffect(() => {
-    fetchHistory(1, modelFilter)
+    const timer = window.setTimeout(() => {
+      void fetchHistory(1, modelFilter)
+    }, 0)
+
+    return () => window.clearTimeout(timer)
   }, [fetchHistory, modelFilter])
 
   const handlePageChange = (newPage: number) => {

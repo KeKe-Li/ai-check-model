@@ -17,9 +17,6 @@ interface StreamState {
 
 interface UseVerificationStreamParams {
   jobId: string
-  endpoint: string
-  apiKey: string
-  model: string
 }
 
 export function useVerificationStream() {
@@ -38,7 +35,7 @@ export function useVerificationStream() {
   const eventSourceRef = useRef<EventSource | null>(null)
 
   const start = useCallback((params: UseVerificationStreamParams) => {
-    const { jobId, endpoint, apiKey, model } = params
+    const { jobId } = params
 
     // 重置状态
     setState({
@@ -53,8 +50,8 @@ export function useVerificationStream() {
       error: null,
     })
 
-    // 构建 SSE URL
-    const url = `/api/verify/${jobId}/stream?endpoint=${encodeURIComponent(endpoint)}&apiKey=${encodeURIComponent(apiKey)}&model=${encodeURIComponent(model)}`
+    // 构建 SSE URL：只包含 jobId，敏感 API Key 不进入查询参数。
+    const url = `/api/verify/${jobId}/stream`
 
     // 创建 EventSource 连接
     const eventSource = new EventSource(url)

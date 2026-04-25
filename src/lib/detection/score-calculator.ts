@@ -1,5 +1,6 @@
 import type { VerificationConfig, VerificationReport, DetectorResult, ConfidenceLevel } from './types'
 import { getModelInfo } from './types'
+import { assessAuthenticity, collectAuthenticitySignals } from './authenticity-signals'
 
 /**
  * 评分计算器
@@ -26,19 +27,21 @@ export class ScoreCalculator {
       ? Math.round((totalScore / totalMaxScore) * 100)
       : 0
 
-    const confidenceLevel = this.classifyConfidence(normalizedScore)
-    const verdict = this.generateVerdict(normalizedScore, confidenceLevel, config.model, results)
+    const { finalScore, assessment } = assessAuthenticity(config, results, normalizedScore)
+    const confidenceLevel = this.classifyConfidence(finalScore)
+    const verdict = this.generateVerdict(finalScore, confidenceLevel, config.model, results)
     const modelDetected = this.inferModel(results, config.model)
 
     return {
       jobId: config.jobId,
-      totalScore: normalizedScore,
+      totalScore: finalScore,
       confidenceLevel,
       verdict,
       modelClaimed: config.model,
       modelDetected,
       results,
       durationMs,
+      authenticity: assessment,
     }
   }
 
@@ -61,6 +64,13 @@ export class ScoreCalculator {
     const modelName = modelInfo?.name ?? modelClaimed
 
     const failedDetectors = results.filter(r => r.status === 'fail')
+    const fatalSignals = collectAuthenticitySignals(results).filter((signal) =>
+      signal.severity === 'fatal' && signal.polarity !== 'positive' && signal.polarity !== 'neutral'
+    )
+
+    if (fatalSignals.length > 0) {
+      return `该端点存在致命真实性矛盾，极可能不是真实的 ${modelName}：${fatalSignals[0].message}`
+    }
 
     switch (confidence) {
       case 'HIGH':
@@ -76,6 +86,14 @@ export class ScoreCalculator {
 
   /** 从检测结果推断实际模型 */
   static inferModel(results: DetectorResult[], claimed: string): string | null {
+    const mismatchSignal = collectAuthenticitySignals(results).find((signal) =>
+      signal.id === 'returned-model-provider-mismatch' &&
+      typeof signal.evidence?.returnedModel === 'string'
+    )
+    if (mismatchSignal?.evidence?.returnedModel) {
+      return mismatchSignal.evidence.returnedModel as string
+    }
+
     // 查找身份一致性检测器的结果
     const identityResult = results.find(r => r.detectorName === 'identity-consistency')
     if (identityResult?.details?.detectedModel) {

@@ -52,6 +52,33 @@ export default function ResultCard({ report }: ResultCardProps) {
           <p className="text-xl font-semibold">{report.verdict}</p>
         </div>
 
+        {/* 真实性评估 */}
+        {report.authenticity && (
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm text-muted-foreground">真实性评估</p>
+                <p className="font-medium">
+                  {formatAuthenticityVerdict(report.authenticity.verdict)}
+                </p>
+              </div>
+              {report.authenticity.scoreCapApplied !== undefined && (
+                <Badge variant="destructive">
+                  已封顶 ≤ {report.authenticity.scoreCapApplied}
+                </Badge>
+              )}
+            </div>
+
+            {report.authenticity.summary.length > 0 && (
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                {report.authenticity.summary.slice(0, 3).map((item, index) => (
+                  <li key={index}>- {item}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         {/* 信息网格 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
           {/* 声称模型 */}
@@ -85,4 +112,21 @@ export default function ResultCard({ report }: ResultCardProps) {
       </CardContent>
     </Card>
   )
+}
+
+function formatAuthenticityVerdict(verdict: NonNullable<VerificationReport['authenticity']>['verdict']) {
+  switch (verdict) {
+    case 'likely_genuine':
+      return '高概率真实，未发现关键掺假证据'
+    case 'compatible_but_unverified':
+      return '接口兼容但官方能力证据不足，不能判定完全不掺假'
+    case 'inconclusive':
+      return '证据不足，无法裁决真伪'
+    case 'needs_review':
+      return '需要人工复核，证据不足以下强结论'
+    case 'suspicious':
+      return '存在关键疑点，不能判为不掺假'
+    case 'likely_fake':
+      return '高度疑似掺假或跨供应商套壳'
+  }
 }

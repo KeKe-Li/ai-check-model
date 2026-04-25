@@ -5,6 +5,9 @@ import { detectApiFormat } from '@/lib/api-client/smart-client'
 
 // 导入所有检测器
 import { MetadataDetector } from './detectors/metadata'
+import { ProviderAuthenticityDetector } from './detectors/provider-authenticity'
+import { OpenAIResponsesFingerprintDetector } from './detectors/openai-responses-fingerprint'
+import { RandomizedChallengeDetector } from './detectors/randomized-challenge'
 import { IdentityConsistencyDetector } from './detectors/identity-consistency'
 import { KnowledgeCutoffDetector } from './detectors/knowledge-cutoff'
 import { MagicStringDetector } from './detectors/magic-string'
@@ -23,6 +26,9 @@ export class DetectionOrchestrator {
   constructor() {
     this.detectors = [
       new MetadataDetector(),
+      new ProviderAuthenticityDetector(),
+      new OpenAIResponsesFingerprintDetector(),
+      new RandomizedChallengeDetector(),
       new MagicStringDetector(),
       new IdentityConsistencyDetector(),
       new KnowledgeCutoffDetector(),
@@ -76,7 +82,7 @@ export class DetectionOrchestrator {
       }
 
       try {
-        const result = await detector.detect(config, (message) => {
+        const result = await detector.detect(config, () => {
           // 进度回调 - 检测器可以通过此回调报告内部进度
           // 如需实时反馈，可扩展为 yield { type: 'detector:progress', message }
         })

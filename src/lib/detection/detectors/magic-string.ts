@@ -6,6 +6,7 @@ import {
   ANTHROPIC_REFUSAL_STRING,
   ANTHROPIC_REDACTED_THINKING_STRING,
 } from '../constants/magic-strings'
+import { analyzeClaudeRedactedThinking } from '../claude-thinking-analysis'
 
 /**
  * 魔术字符串检测器
@@ -174,17 +175,20 @@ export class MagicStringDetector extends BaseDetector {
 
       // 使用 SmartResponse 的 thinkingBlocks 和 thinkingText
       if (response.thinkingBlocks && response.thinkingBlocks.length > 0) {
-        const hasRedacted = response.thinkingBlocks.some((block) => {
-          const thinkingText = block.thinking ?? block.text ?? ''
-          return thinkingText.includes('[redacted]') ||
-                 thinkingText.includes('redacted') ||
-                 thinkingText.trim() === ''
-        })
+        const redactedAnalysis = analyzeClaudeRedactedThinking(response.thinkingBlocks)
 
-        if (hasRedacted) {
-          score += 8
-          findings.push('思考编辑字符串测试通过: 思考内容包含 [redacted]（预期行为）')
+        if (redactedAnalysis.hasRedactedThinking) {
+          score += redactedAnalysis.score
+          findings.push(...redactedAnalysis.findings)
         } else {
+          const hasEmptyThinking = response.thinkingBlocks.some((block) =>
+            (block.thinking ?? block.text ?? '').trim() === ''
+          )
+          if (hasEmptyThinking) {
+            score += 4
+            findings.push('思考编辑字符串测试部分通过: thinking 块为空，可能被安全编辑')
+            return { score, findings }
+          }
           findings.push('思考编辑字符串测试未通过: 思考内容未被编辑（真正的 Claude 会返回 [redacted]）')
         }
       } else if (response.thinkingText) {
