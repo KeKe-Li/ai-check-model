@@ -100,6 +100,41 @@ export class OpenAICompatClient {
   }
 
   /**
+   * 查询模型目录中的指定模型。
+   *
+   * 官方 OpenAI API 暴露 GET /v1/models/{model}；很多中转站也会模拟
+   * 该接口。这里不把 404/405 直接抛错，而是把状态码和 body 交给检测器
+   * 分析，避免误杀“不实现模型目录但聊天接口可用”的中转站。
+   */
+  async retrieveModel(model: string): Promise<OpenAIResponse> {
+    const url = `${this.endpoint}/models/${encodeURIComponent(model)}`
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'content-type': 'application/json',
+      },
+    })
+
+    const headers = this.extractHeaders(response)
+    let body: unknown = null
+    try {
+      body = await response.json()
+    } catch {
+      const text = await response.text().catch(() => '')
+      body = { error: { message: text || `HTTP ${response.status}` } }
+    }
+
+    return {
+      status: response.status,
+      headers,
+      body,
+      raw: response,
+    }
+  }
+
+  /**
    * 提取响应头为普通对象
    */
   private extractHeaders(response: Response): Record<string, string> {

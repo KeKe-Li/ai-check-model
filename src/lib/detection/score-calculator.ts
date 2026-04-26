@@ -1,4 +1,10 @@
-import type { VerificationConfig, VerificationReport, DetectorResult, ConfidenceLevel } from './types'
+import type {
+  AuthenticityAssessment,
+  VerificationConfig,
+  VerificationReport,
+  DetectorResult,
+  ConfidenceLevel,
+} from './types'
 import { getModelInfo } from './types'
 import { assessAuthenticity, collectAuthenticitySignals } from './authenticity-signals'
 
@@ -29,7 +35,7 @@ export class ScoreCalculator {
 
     const { finalScore, assessment } = assessAuthenticity(config, results, normalizedScore)
     const confidenceLevel = this.classifyConfidence(finalScore)
-    const verdict = this.generateVerdict(finalScore, confidenceLevel, config.model, results)
+    const verdict = this.generateVerdict(finalScore, confidenceLevel, config.model, results, assessment)
     const modelDetected = this.inferModel(results, config.model)
 
     return {
@@ -58,7 +64,8 @@ export class ScoreCalculator {
     score: number,
     confidence: ConfidenceLevel,
     modelClaimed: string,
-    results: DetectorResult[]
+    results: DetectorResult[],
+    assessment?: AuthenticityAssessment
   ): string {
     const modelInfo = getModelInfo(modelClaimed)
     const modelName = modelInfo?.name ?? modelClaimed
@@ -69,7 +76,23 @@ export class ScoreCalculator {
     )
 
     if (fatalSignals.length > 0) {
-      return `该端点存在致命真实性矛盾，极可能不是真实的 ${modelName}：${fatalSignals[0].message}`
+      return `该端点存在致命真实性矛盾，极可能不是真实的 ${modelName}，存在掺假风险：${fatalSignals[0].message}`
+    }
+
+    if (assessment?.verdict === 'suspicious') {
+      return `该端点存在关键真实性疑点，不能判定为不掺假的 ${modelName}；建议优先核对官方来源指纹、模型字段和专属能力证据`
+    }
+
+    if (assessment?.verdict === 'compatible_but_unverified') {
+      return `该端点兼容性表现较好，但强官方专属证据不足，不能断言不掺假；建议重点查看 Responses、logprobs、thinking 或魔术字符串等关键检测`
+    }
+
+    if (assessment?.verdict === 'inconclusive') {
+      return `该端点证据不足，暂时无法确认是否为不掺假的 ${modelName}；需要更多关键检测结果`
+    }
+
+    if (assessment?.verdict === 'likely_genuine') {
+      return `多项强证据支持该端点提供真实的 ${modelName}，${results.filter(r => r.status === 'pass').length} 项检测通过`
     }
 
     switch (confidence) {
@@ -87,7 +110,7 @@ export class ScoreCalculator {
   /** 从检测结果推断实际模型 */
   static inferModel(results: DetectorResult[], claimed: string): string | null {
     const mismatchSignal = collectAuthenticitySignals(results).find((signal) =>
-      signal.id === 'returned-model-provider-mismatch' &&
+      (signal.id === 'returned-model-provider-mismatch' || signal.id === 'returned-model-family-mismatch') &&
       typeof signal.evidence?.returnedModel === 'string'
     )
     if (mismatchSignal?.evidence?.returnedModel) {

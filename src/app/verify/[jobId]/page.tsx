@@ -20,11 +20,14 @@ export default function VerifyPage({ params }: PageProps) {
   const { state, start, reset } = useVerificationStream()
 
   // 自动开始验证
+  // 不依赖 state.status，避免 React Strict Mode 双重 mount 时
+  // 第二次 effect 因 status 已变为 'connecting' 而跳过 start()
   useEffect(() => {
-    if (state.status === 'idle') {
-      start({ jobId })
+    start({ jobId })
+    return () => {
+      reset()
     }
-  }, [jobId, state.status, start])
+  }, [jobId, start, reset])
 
   // 处理重试
   const handleRetry = () => {

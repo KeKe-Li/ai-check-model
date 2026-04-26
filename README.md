@@ -8,7 +8,7 @@ Many API relay stations proxy AI model APIs, but some engage in bait-and-switch 
 
 ## Key Features
 
-- **Multi-dimensional Detection** — 8 independent detectors covering metadata, behavioral fingerprinting, and capability testing
+- **Multi-dimensional Detection** — 12 independent detectors covering metadata, model catalog, official capability fingerprints, behavioral fingerprinting, and capability testing
 - **Real-time Progress** — SSE streaming shows each detection step as it completes
 - **Hard to Fake** — Deep verification based on model-specific capabilities (thinking blocks, logprobs, magic strings)
 - **Leaderboard** — Community-driven relay station reputation ranking
@@ -20,6 +20,10 @@ Incorporates battle-tested detection techniques from the community:
 | Detector | Score | Method |
 |----------|-------|--------|
 | Metadata Verification | 15 | HTTP response headers, response ID format (`msg_` vs `chatcmpl-`), model field |
+| Provider Authenticity | 25 | Cross-check response metadata, provider-specific capabilities, and relay traces |
+| Model Catalog | 10 | Query `/v1/models/{model}` to verify the claimed model at the catalog/routing layer |
+| OpenAI Responses Fingerprint | 15 | Verify official Responses API response shape for GPT/OpenAI models |
+| Randomized Challenge | 10 | Nonce + random JSON arithmetic challenge to detect cached or hard-coded answers |
 | Magic String | 20 | Anthropic's official trigger strings for refusal/redacted thinking tests (impossible to fake) |
 | Identity Consistency | 20 | Multi-angle identity probing, proxy identifier detection (kiro/openclaw etc.), contradiction analysis |
 | Knowledge Cutoff | 15 | Knowledge boundary probing + corpus-specific verification |
@@ -32,15 +36,15 @@ Incorporates battle-tested detection techniques from the community:
 
 ## Supported Models
 
-**Claude**: Opus 4.7, Opus 4.6, Sonnet 4.5, Sonnet 4
+**Claude**: Opus 4.7, Opus 4.6, Sonnet 4.6, Haiku 4.5, Sonnet 4
 
-**OpenAI**: GPT-5.4, GPT-5.2, GPT-4o, o3
+**OpenAI**: GPT-5.5, GPT-5.4, GPT-5.4 mini, GPT-4o, o3
 
 **Google**: Gemini 3.1 Pro, Gemini 3 Flash, Gemini 2.5 Pro
 
 ## Tech Stack
 
-- **Framework**: Next.js 15 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **UI**: shadcn/ui + Tailwind CSS 4 + framer-motion
 - **Database**: Drizzle ORM + PostgreSQL (Neon Serverless)
 - **Validation**: Zod + react-hook-form
@@ -105,7 +109,7 @@ src/
     ├── detection/              # Detection engine
     │   ├── orchestrator.ts     # Detection orchestrator (AsyncGenerator + SSE)
     │   ├── score-calculator.ts # Score calculator
-    │   ├── detectors/          # 8 detector implementations
+    │   ├── detectors/          # 12 detector implementations
     │   └── constants/          # Keywords, magic strings, benchmark questions
     ├── api-client/             # Anthropic / OpenAI-compatible API clients
     ├── db/                     # Drizzle ORM schema + queries

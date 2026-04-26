@@ -1,15 +1,7 @@
 'use client'
 
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { SUPPORTED_MODELS } from '@/lib/detection/types'
+import { cn } from '@/lib/utils'
 
 interface ModelSelectorProps {
   value: string
@@ -18,11 +10,6 @@ interface ModelSelectorProps {
 }
 
 export default function ModelSelector({ value, onChange, disabled }: ModelSelectorProps) {
-  const handleChange = (newValue: string | null) => {
-    if (newValue) {
-      onChange(newValue)
-    }
-  }
   // 按供应商分组模型
   const groupedModels = SUPPORTED_MODELS.reduce((acc, model) => {
     if (!acc[model.group]) {
@@ -35,27 +22,37 @@ export default function ModelSelector({ value, onChange, disabled }: ModelSelect
   // 供应商显示名称映射
   const groupLabels: Record<string, string> = {
     claude: 'Claude',
+    Claude: 'Claude',
     openai: 'OpenAI',
+    OpenAI: 'OpenAI',
     google: 'Google',
+    Google: 'Google',
   }
 
   return (
-    <Select value={value} onValueChange={handleChange} disabled={disabled}>
-      <SelectTrigger>
-        <SelectValue placeholder="选择模型" />
-      </SelectTrigger>
-      <SelectContent>
-        {Object.entries(groupedModels).map(([group, models]) => (
-          <SelectGroup key={group}>
-            <SelectLabel>{groupLabels[group] || group}</SelectLabel>
-            {models.map((model) => (
-              <SelectItem key={model.id} value={model.id}>
-                {model.name}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        ))}
-      </SelectContent>
-    </Select>
+    <select
+      id="model"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      disabled={disabled}
+      className={cn(
+        'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm',
+        'outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50',
+        'disabled:cursor-not-allowed disabled:opacity-50'
+      )}
+    >
+      <option value="" disabled>
+        选择模型
+      </option>
+      {Object.entries(groupedModels).map(([group, models]) => (
+        <optgroup key={group} label={groupLabels[group] || group}>
+          {models.map((model) => (
+            <option key={model.id} value={model.id}>
+              {model.name}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
   )
 }

@@ -3,18 +3,22 @@ import { drizzle } from 'drizzle-orm/neon-http'
 import * as schema from './schema'
 
 /**
- * Neon HTTP 连接实例
- * 使用环境变量 DATABASE_URL 配置连接字符串
+ * 数据库连接（可选）
+ *
+ * DATABASE_URL 未设置时返回 null，调用方应先判空再操作。
+ * 这样在本地开发或未配置数据库的环境中，检测流程不受影响。
  */
-const sql = neon(process.env.DATABASE_URL!)
+function createDb() {
+  const url = process.env.DATABASE_URL
+  if (!url) return null
 
-/**
- * Drizzle ORM 数据库实例
- * 包含完整的 schema 类型定义
- */
-export const db = drizzle(sql, { schema })
+  const sql = neon(url)
+  return drizzle(sql, { schema })
+}
+
+export const db = createDb()
 
 /**
  * 数据库类型，用于依赖注入和类型推导
  */
-export type Database = typeof db
+export type Database = NonNullable<typeof db>

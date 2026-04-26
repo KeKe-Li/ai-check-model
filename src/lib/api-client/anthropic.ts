@@ -148,6 +148,41 @@ export class AnthropicClient {
   }
 
   /**
+   * 查询 Anthropic 模型目录中的指定模型。
+   *
+   * 该接口可用于确认中转站是否真的把声称模型暴露为 Anthropic 模型目录项。
+   * 这里保留 HTTP 状态码，交给检测器区分“目录不支持”和“明确串模型”。
+   */
+  async retrieveModel(model: string): Promise<AnthropicResponse> {
+    const url = `${this.endpoint}/models/${encodeURIComponent(model)}`
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-api-key': this.apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+    })
+
+    const headers = this.extractHeaders(response)
+    let body: unknown = null
+    try {
+      body = await response.json()
+    } catch {
+      const text = await response.text().catch(() => '')
+      body = { error: { message: text || `HTTP ${response.status}` } }
+    }
+
+    return {
+      status: response.status,
+      headers,
+      body,
+      raw: response,
+    }
+  }
+
+  /**
    * 提取响应头为普通对象
    */
   private extractHeaders(response: Response): Record<string, string> {

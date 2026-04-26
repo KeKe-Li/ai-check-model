@@ -24,6 +24,18 @@ interface ProviderMetadataInput {
   headers: Record<string, string>
 }
 
+export interface ComparableModelIdentity {
+  provider: ModelProvider
+  family: string
+  normalized: string
+}
+
+export interface ModelIdentityComparison {
+  matched: boolean
+  claimed: ComparableModelIdentity
+  returned: ComparableModelIdentity
+}
+
 /**
  * 从模型名称或供应商关键词中严格推断提供商。
  *
@@ -53,6 +65,108 @@ export function inferProviderStrict(value: string | null | undefined): ModelProv
   }
 
   return null
+}
+
+/**
+ * 规整中转站常见的模型名前缀。
+ *
+ * 例如 OpenRouter / LiteLLM 一类中转可能返回 `openai/gpt-4o`
+ * 或 `anthropic/claude-sonnet-4-20250514`。这些路由前缀不是模型身份，
+ * 需要剥离后再判断是否同一档位模型。
+ */
+export function normalizeModelId(value: string): string {
+  const lower = value.trim().toLowerCase().replace(/_/g, '-')
+  const candidates = lower
+    .split(/[/:]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+  return [...candidates].reverse().find((item) => inferProviderStrict(item)) ?? lower
+}
+
+export function isDateLikeToken(token: string): boolean {
+  return /^\d{6,8}$/.test(token) || /^\d{4}$/.test(token)
+}
+
+function canonicalizeOpenAIModel(normalized: string): string | null {
+  // 顺序很重要：mini/nano 是独立档位，不能被 gpt-4o 提前吞掉。
+  if (/^gpt-4o-mini(?:[-.].*)?$/.test(normalized)) return 'gpt-4o-mini'
+  if (/^gpt-4o(?:[-.].*)?$/.test(normalized)) return 'gpt-4o'
+
+  const versionMatch = normalized.match(/^gpt[-.]?(\d+)(?:[-.](\d+))?(?:[-.]?(mini|nano|turbo))?/)
+  if (versionMatch) {
+    const [, major, minor, suffix] = versionMatch
+    const version = minor && !isDateLikeToken(minor) ? `${major}.${minor}` : major
+    return `gpt-${version}${suffix ? `-${suffix}` : ''}`
+  }
+
+  const reasoningMatch = normalized.match(/^(o[134])(?:[-.].*)?$/)
+  if (reasoningMatch) return reasoningMatch[1]
+
+  return null
+}
+
+function canonicalizeAnthropicModel(normalized: string): string | null {
+  const modern = normalized.match(/^claude[-.](opus|sonnet|haiku)(?:[-.](.+))?$/)
+  if (modern) {
+    const [, tier, rest = ''] = modern
+    let versionTokens = rest
+      .split(/[-.]/)
+      .filter((token) => /^\d+$/.test(token) && !isDateLikeToken(token))
+      .slice(0, 2)
+
+    // Anthropic 常用 `claude-sonnet-4-0` 这类别名指向
+    // `claude-sonnet-4-YYYYMMDD` 快照；尾部 0 不是独立档位。
+    if (versionTokens.length === 2 && versionTokens[1] === '0') {
+      versionTokens = versionTokens.slice(0, 1)
+    }
+
+    return versionTokens.length > 0
+      ? `claude-${tier}-${versionTokens.join('.')}`
+      : `claude-${tier}`
+  }
+
+  // 兼容旧式命名，例如 claude-3-5-sonnet-20241022。
+  const legacy = normalized.match(/^claude[-.](\d+)(?:[-.](\d+))?[-.](opus|sonnet|haiku)(?:[-.].*)?$/)
+  if (legacy) {
+    const [, major, minor, tier] = legacy
+    const version = minor && !isDateLikeToken(minor) ? `${major}.${minor}` : major
+    return `claude-${tier}-${version}`
+  }
+
+  return null
+}
+
+export function comparableModelIdentity(value: string): ComparableModelIdentity | null {
+  const normalized = normalizeModelId(value)
+  const provider = inferProviderStrict(normalized)
+
+  if (!provider) return null
+
+  let family: string | null = null
+  if (provider === 'openai') family = canonicalizeOpenAIModel(normalized)
+  if (provider === 'anthropic') family = canonicalizeAnthropicModel(normalized)
+  if (provider === 'gemini') {
+    const geminiMatch = normalized.match(/^(gemini[-.]\d+(?:[-.]\d+)?(?:[-.](?:pro|flash))?)(?:[-.].*)?$/)
+    family = geminiMatch?.[1]?.replace(/\./g, '-') ?? null
+  }
+
+  return family ? { provider, family, normalized } : null
+}
+
+export function compareModelIdentity(claimedModel: string, returnedModel: string): ModelIdentityComparison | null {
+  const claimed = comparableModelIdentity(claimedModel)
+  const returned = comparableModelIdentity(returnedModel)
+
+  if (!claimed || !returned || claimed.provider !== returned.provider) {
+    return null
+  }
+
+  return {
+    matched: claimed.family === returned.family,
+    claimed,
+    returned,
+  }
 }
 
 /** 把响应头规整为小写 key，便于跨平台匹配。 */
@@ -154,6 +268,36 @@ export function analyzeProviderMetadata(input: ProviderMetadataInput): Authentic
       message: `响应 model 字段显示为 ${returnedModel}，与声称的 ${claimedModel} 不属于同一供应商`,
       evidence: { claimedModel, claimedProvider, returnedModel, returnedProvider },
     }))
+  }
+
+  if (returnedModel && returnedProvider === claimedProvider) {
+    const modelIdentity = compareModelIdentity(claimedModel, returnedModel)
+
+    if (modelIdentity && !modelIdentity.matched) {
+      signals.push(signal({
+        id: 'returned-model-family-mismatch',
+        severity: 'fatal',
+        message: `响应 model 字段显示为 ${returnedModel}，虽然同属 ${claimedProvider}，但与声称的 ${claimedModel} 不是同一模型系列/档位，存在同厂降级或串模型掺假`,
+        evidence: {
+          claimedModel,
+          returnedModel,
+          claimedFamily: modelIdentity.claimed.family,
+          returnedFamily: modelIdentity.returned.family,
+        },
+      }))
+    } else if (modelIdentity?.matched) {
+      signals.push(signal({
+        id: 'returned-model-identity-match',
+        severity: 'strong',
+        polarity: 'positive',
+        message: `响应 model 字段与声称模型属于同一系列/档位: ${returnedModel}`,
+        evidence: {
+          claimedModel,
+          returnedModel,
+          family: modelIdentity.claimed.family,
+        },
+      }))
+    }
   }
 
   if (responseIdProvider && responseIdProvider !== claimedProvider) {
@@ -304,8 +448,15 @@ function computeKeyDetectorCap(config: VerificationConfig, results: DetectorResu
   if (provider === 'openai') {
     const metadata = results.find((result) => result.detectorName === 'metadata')
     const authenticity = results.find((result) => result.detectorName === 'provider-authenticity')
+    const responses = results.find((result) => result.detectorName === 'openai-responses-fingerprint')
 
     if (isPoorResult(metadata, 0.55) && isPoorResult(authenticity, 0.55)) {
+      return 59
+    }
+
+    // OpenAI 兼容响应结构和行为题都容易被中转层模拟；如果官方能力指纹
+    // 与 Responses API 指纹同时弱，不能让身份自报和推理题把总分抬成高可信。
+    if (isPoorResult(authenticity, 0.55) && isPoorResult(responses, 0.55)) {
       return 59
     }
   }

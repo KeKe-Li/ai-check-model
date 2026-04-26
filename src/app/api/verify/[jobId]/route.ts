@@ -17,6 +17,12 @@ export async function GET(
 
   try {
     const { db } = await import('@/lib/db')
+    if (!db) {
+      return NextResponse.json(
+        { success: false, error: '数据库未配置' },
+        { status: 503 }
+      )
+    }
     const { verificationJobs, detectionResults } = await import('@/lib/db/schema')
     const { eq } = await import('drizzle-orm')
 
