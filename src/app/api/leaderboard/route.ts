@@ -12,6 +12,12 @@ import { NextResponse } from 'next/server'
 export async function GET() {
   try {
     const { db } = await import('@/lib/db')
+    if (!db) {
+      return NextResponse.json(
+        { success: false, error: '数据库未配置' },
+        { status: 503 }
+      )
+    }
     const { leaderboardEntries } = await import('@/lib/db/schema')
     const { desc } = await import('drizzle-orm')
 

@@ -6,6 +6,7 @@ import { detectApiFormat } from '@/lib/api-client/smart-client'
 // 导入所有检测器
 import { MetadataDetector } from './detectors/metadata'
 import { ProviderAuthenticityDetector } from './detectors/provider-authenticity'
+import { ModelCatalogDetector } from './detectors/model-catalog'
 import { OpenAIResponsesFingerprintDetector } from './detectors/openai-responses-fingerprint'
 import { RandomizedChallengeDetector } from './detectors/randomized-challenge'
 import { IdentityConsistencyDetector } from './detectors/identity-consistency'
@@ -27,6 +28,7 @@ export class DetectionOrchestrator {
     this.detectors = [
       new MetadataDetector(),
       new ProviderAuthenticityDetector(),
+      new ModelCatalogDetector(),
       new OpenAIResponsesFingerprintDetector(),
       new RandomizedChallengeDetector(),
       new MagicStringDetector(),

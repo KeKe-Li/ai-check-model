@@ -163,8 +163,18 @@ export const SUPPORTED_MODELS: ModelInfo[] = [
     group: 'Claude',
   },
   {
-    id: 'claude-sonnet-4-5-20250929',
-    name: 'Claude Sonnet 4.5',
+    id: 'claude-sonnet-4-6',
+    name: 'Claude Sonnet 4.6',
+    provider: 'anthropic',
+    knowledgeCutoff: '2025-05',
+    supportsThinking: true,
+    supportsLogprobs: false,
+    supportsStreaming: true,
+    group: 'Claude',
+  },
+  {
+    id: 'claude-haiku-4-5-20251001',
+    name: 'Claude Haiku 4.5',
     provider: 'anthropic',
     knowledgeCutoff: '2025-04',
     supportsThinking: true,
@@ -184,22 +194,32 @@ export const SUPPORTED_MODELS: ModelInfo[] = [
   },
   // GPT 系列
   {
-    id: 'gpt-5.4',
-    name: 'GPT-5.4',
+    id: 'gpt-5.5',
+    name: 'GPT-5.5',
     provider: 'openai',
-    knowledgeCutoff: '2025-06',
+    knowledgeCutoff: '2025-12',
     supportsThinking: true,
-    supportsLogprobs: true,
+    supportsLogprobs: false,
     supportsStreaming: true,
     group: 'OpenAI',
   },
   {
-    id: 'gpt-5.2',
-    name: 'GPT-5.2',
+    id: 'gpt-5.4',
+    name: 'GPT-5.4',
     provider: 'openai',
-    knowledgeCutoff: '2025-03',
+    knowledgeCutoff: '2025-08',
     supportsThinking: true,
-    supportsLogprobs: true,
+    supportsLogprobs: false,
+    supportsStreaming: true,
+    group: 'OpenAI',
+  },
+  {
+    id: 'gpt-5.4-mini',
+    name: 'GPT-5.4 mini',
+    provider: 'openai',
+    knowledgeCutoff: '2025-08',
+    supportsThinking: true,
+    supportsLogprobs: false,
     supportsStreaming: true,
     group: 'OpenAI',
   },
@@ -279,7 +299,8 @@ export function getProviderFromModel(modelId: string): ModelProvider {
     modelId.startsWith('gpt') ||
     modelId.startsWith('o1') ||
     modelId.startsWith('o3') ||
-    modelId.startsWith('o4')
+    modelId.startsWith('o4') ||
+    modelId.startsWith('o5')
   ) return 'openai'
   if (modelId.startsWith('gemini')) return 'gemini'
 

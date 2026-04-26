@@ -37,6 +37,12 @@ export function useVerificationStream() {
   const start = useCallback((params: UseVerificationStreamParams) => {
     const { jobId } = params
 
+    // 先关闭已有连接，防止 React Strict Mode 双重 mount 导致连接泄漏
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
+    }
+
     // 重置状态
     setState({
       status: 'connecting',
@@ -146,10 +152,15 @@ export function useVerificationStream() {
       }
     })
 
-    // 监听 error 事件
-    eventSource.addEventListener('error', (e: MessageEvent) => {
+    // 监听服务端发送的 SSE error 事件（带 data 字段）
+    eventSource.addEventListener('error', (e: Event) => {
+      // 区分服务端 SSE error 事件和浏览器原生连接错误：
+      // 服务端事件是 MessageEvent，有 data 属性；原生错误是 Event，无 data。
+      const me = e as MessageEvent
+      if (typeof me.data !== 'string') return // 原生连接错误，由 onerror 处理
+
       try {
-        const data = JSON.parse(e.data) as DetectionEvent & { type: 'error' }
+        const data = JSON.parse(me.data) as DetectionEvent & { type: 'error' }
         setState((prev) => ({
           ...prev,
           status: 'error',
@@ -157,34 +168,28 @@ export function useVerificationStream() {
           progressMessage: null,
         }))
         eventSource.close()
-      } catch (error) {
-        console.error('解析 error 事件失败:', error)
-        setState((prev) => ({
-          ...prev,
-          status: 'error',
-          error: '连接失败，请重试',
-          progressMessage: null,
-        }))
-        eventSource.close()
+      } catch {
+        // data 不是有效 JSON，忽略
       }
     })
 
-    // 监听连接错误
+    // 监听浏览器原生连接错误（网络断开、服务端返回非 SSE 响应等）
     eventSource.onerror = () => {
+      // 连接已关闭或服务端拒绝连接
       if (eventSource.readyState === EventSource.CLOSED) {
-        // 连接已关闭，检查是否是正常完成
         setState((prev) => {
-          if (prev.status === 'completed') {
+          if (prev.status === 'completed' || prev.status === 'error') {
             return prev
           }
           return {
             ...prev,
             status: 'error',
-            error: '连接意外断开',
+            error: '检测服务连接断开，请检查网络后重试',
             progressMessage: null,
           }
         })
       }
+      // readyState === CONNECTING 时 EventSource 会自动重连，暂不干预
     }
   }, [])
 

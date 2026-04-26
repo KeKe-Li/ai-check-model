@@ -34,6 +34,114 @@ describe('analyzeProviderMetadata', () => {
     )
   })
 
+  it('声称高阶 GPT 但同厂返回更低档 GPT 时标记为致命掺假信号', () => {
+    const signals = analyzeProviderMetadata({
+      claimedModel: 'gpt-5.5',
+      apiFormat: 'openai',
+      body: {
+        id: 'chatcmpl-123',
+        object: 'chat.completion',
+        model: 'gpt-4o',
+        choices: [{ message: { content: 'OK' } }],
+      },
+      headers: {
+        'x-request-id': 'req_abc',
+      },
+    })
+
+    expect(signals).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'returned-model-family-mismatch',
+          severity: 'fatal',
+        }),
+      ])
+    )
+  })
+
+  it('Claude 最新别名和快照模型号一致时不误判为掺假', () => {
+    const signals = analyzeProviderMetadata({
+      claimedModel: 'claude-sonnet-4-6',
+      apiFormat: 'anthropic',
+      body: {
+        id: 'msg_01ABC',
+        type: 'message',
+        model: 'claude-sonnet-4-6-20260210',
+        content: [{ type: 'text', text: 'OK' }],
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 8, output_tokens: 2 },
+      },
+      headers: {
+        'request-id': 'req_abc',
+      },
+    })
+
+    expect(signals.some((signal) => signal.id === 'returned-model-family-mismatch')).toBe(false)
+    expect(signals).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'returned-model-identity-match',
+          severity: 'strong',
+          polarity: 'positive',
+        }),
+      ])
+    )
+  })
+
+  it('声称 Claude Opus 但同厂返回 Claude Sonnet 时标记为致命掺假信号', () => {
+    const signals = analyzeProviderMetadata({
+      claimedModel: 'claude-opus-4-7',
+      apiFormat: 'anthropic',
+      body: {
+        id: 'msg_01ABC',
+        type: 'message',
+        model: 'claude-sonnet-4-5-20250929',
+        content: [{ type: 'text', text: 'OK' }],
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 8, output_tokens: 2 },
+      },
+      headers: {
+        'request-id': 'req_abc',
+      },
+    })
+
+    expect(signals).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'returned-model-family-mismatch',
+          severity: 'fatal',
+        }),
+      ])
+    )
+  })
+
+  it('官方快照模型号与基础模型一致时不误判为掺假', () => {
+    const signals = analyzeProviderMetadata({
+      claimedModel: 'gpt-4o',
+      apiFormat: 'openai',
+      body: {
+        id: 'chatcmpl-123',
+        object: 'chat.completion',
+        model: 'gpt-4o-2024-08-06',
+        choices: [{ message: { content: 'OK' } }],
+      },
+      headers: {
+        'x-request-id': 'req_abc',
+      },
+    })
+
+    expect(signals.some((signal) => signal.id === 'returned-model-family-mismatch')).toBe(false)
+    expect(signals).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'returned-model-identity-match',
+          severity: 'strong',
+          polarity: 'positive',
+        }),
+      ])
+    )
+  })
+
   it('声称 Claude 且经过 OpenAI 兼容层但模型字段仍为 Claude 时不直接误杀', () => {
     const signals = analyzeProviderMetadata({
       claimedModel: 'claude-sonnet-4-20250514',

@@ -93,6 +93,8 @@ export async function GET(
 async function saveResults(config: VerificationConfig, report: VerificationReport) {
   try {
     const { db } = await import('@/lib/db')
+    if (!db) return // DATABASE_URL 未配置，跳过保存
+
     const { verificationJobs, detectionResults } = await import('@/lib/db/schema')
 
     // 从端点 URL 提取域名
