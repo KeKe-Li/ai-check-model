@@ -1,7 +1,11 @@
 import { BaseDetector } from './base'
 import type { DetectorResult, VerificationConfig } from '../types'
 import { SmartClient } from '@/lib/api-client/smart-client'
-import { BENCHMARK_QUESTIONS } from '../constants/benchmark-questions'
+import {
+  BENCHMARK_QUESTION_POOL,
+  BENCHMARK_SAMPLE_SIZE,
+  sampleQuestions,
+} from '../constants/benchmark-questions'
 import type { BenchmarkQuestion } from '../constants/benchmark-questions'
 
 /**
@@ -26,15 +30,18 @@ export class ReasoningBenchmarkDetector extends BaseDetector {
     try {
       const client = new SmartClient(config.endpoint, config.apiKey, config.apiFormat ?? 'openai')
 
-      // 每道题分配的分数
-      const scorePerQuestion = Math.floor(this.maxScore / BENCHMARK_QUESTIONS.length)
-      const remainingScore = this.maxScore - scorePerQuestion * BENCHMARK_QUESTIONS.length
+      // 从题库随机抽题（参数化题目会实例化为具体数值）
+      const selectedQuestions = sampleQuestions(BENCHMARK_QUESTION_POOL, BENCHMARK_SAMPLE_SIZE)
 
-      for (let i = 0; i < BENCHMARK_QUESTIONS.length; i++) {
-        const question = BENCHMARK_QUESTIONS[i]
+      // 每道题分配的分数
+      const scorePerQuestion = Math.floor(this.maxScore / selectedQuestions.length)
+      const remainingScore = this.maxScore - scorePerQuestion * selectedQuestions.length
+
+      for (let i = 0; i < selectedQuestions.length; i++) {
+        const question = selectedQuestions[i]
         const questionMaxScore = scorePerQuestion + (i === 0 ? remainingScore : 0)
 
-        onProgress(`正在测试推理题 ${i + 1}/${BENCHMARK_QUESTIONS.length}: ${question.id}...`)
+        onProgress(`正在测试推理题 ${i + 1}/${selectedQuestions.length}: ${question.id}...`)
 
         const result = await this.testQuestion(client, config.model, question, questionMaxScore)
         score += result.score
@@ -42,9 +49,9 @@ export class ReasoningBenchmarkDetector extends BaseDetector {
       }
 
       if (score >= this.maxScore * 0.8) {
-        return this.pass(score, findings, { questionsCount: BENCHMARK_QUESTIONS.length })
+        return this.pass(score, findings, { questionsCount: selectedQuestions.length })
       }
-      return this.fail(score, findings, { questionsCount: BENCHMARK_QUESTIONS.length })
+      return this.fail(score, findings, { questionsCount: selectedQuestions.length })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       return this.skip(`推理基准检测无法执行: ${message}`)

@@ -16,6 +16,8 @@ import { ThinkingBlockDetector } from './detectors/thinking-block'
 import { OutputFormatDetector } from './detectors/output-format'
 import { ReasoningBenchmarkDetector } from './detectors/reasoning-benchmark'
 import { LatencyProfileDetector } from './detectors/latency-profile'
+import { SystemPromptProbeDetector } from './detectors/system-prompt-probe'
+import { DeterministicConsistencyDetector } from './detectors/deterministic-consistency'
 
 /**
  * 检测编排器
@@ -32,7 +34,9 @@ export class DetectionOrchestrator {
       new OpenAIResponsesFingerprintDetector(),
       new RandomizedChallengeDetector(),
       new MagicStringDetector(),
+      new SystemPromptProbeDetector(),
       new IdentityConsistencyDetector(),
+      new DeterministicConsistencyDetector(),
       new KnowledgeCutoffDetector(),
       new ThinkingBlockDetector(),
       new OutputFormatDetector(),

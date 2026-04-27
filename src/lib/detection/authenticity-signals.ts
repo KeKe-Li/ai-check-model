@@ -437,6 +437,12 @@ function computeKeyDetectorCap(config: VerificationConfig, results: DetectorResu
   if (provider === 'anthropic') {
     const magic = results.find((result) => result.detectorName === 'magic-string')
     const thinking = results.find((result) => result.detectorName === 'thinking-block')
+    const sysPrompt = results.find((result) => result.detectorName === 'system-prompt-probe')
+
+    // 系统提示词探针暴露伪装时，直接封顶到极低分
+    if (sysPrompt && sysPrompt.status === 'fail' && sysPrompt.score === 0) {
+      return 29
+    }
 
     // Claude 真伪最依赖魔术字符串和 thinking/推理块。
     // 两个核心证据都弱时，不能让身份自报、风格、延迟把总分抬成高可信。
@@ -449,6 +455,12 @@ function computeKeyDetectorCap(config: VerificationConfig, results: DetectorResu
     const metadata = results.find((result) => result.detectorName === 'metadata')
     const authenticity = results.find((result) => result.detectorName === 'provider-authenticity')
     const responses = results.find((result) => result.detectorName === 'openai-responses-fingerprint')
+    const sysPrompt = results.find((result) => result.detectorName === 'system-prompt-probe')
+
+    // 系统提示词探针暴露伪装时，直接封顶到极低分
+    if (sysPrompt && sysPrompt.status === 'fail' && sysPrompt.score === 0) {
+      return 29
+    }
 
     if (isPoorResult(metadata, 0.55) && isPoorResult(authenticity, 0.55)) {
       return 59
