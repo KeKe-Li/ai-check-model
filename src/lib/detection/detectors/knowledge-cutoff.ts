@@ -3,7 +3,7 @@ import type { DetectorResult, VerificationConfig } from '../types'
 import { getProviderFromModel, getModelInfo } from '../types'
 import type { ModelProvider } from '../types'
 import { SmartClient } from '@/lib/api-client/smart-client'
-import { KNOWLEDGE_QUESTIONS } from '../constants/benchmark-questions'
+import { sampleKnowledgeQuestions } from '../constants/benchmark-questions'
 
 /**
  * 知识截止日期检测器
@@ -151,7 +151,9 @@ export class KnowledgeCutoffDetector extends BaseDetector {
     const findings: string[] = []
     let score = 0
 
-    for (const kq of KNOWLEDGE_QUESTIONS) {
+    const selectedQuestions = sampleKnowledgeQuestions()
+
+    for (const kq of selectedQuestions) {
       const response = await this.askQuestion(client, model, kq.question)
       const lower = response.toLowerCase()
 
