@@ -7,7 +7,7 @@ import type {
   ModelProvider,
   VerificationConfig,
 } from './types'
-import { getProviderFromModel } from './types'
+import { getModelInfo, getProviderFromModel } from './types'
 
 const SEVERITY_RANK: Record<AuthenticitySignalSeverity, number> = {
   info: 0,
@@ -433,47 +433,72 @@ function isPoorResult(result: DetectorResult | undefined, ratio = 0.5): boolean 
 
 function computeKeyDetectorCap(config: VerificationConfig, results: DetectorResult[]): number | null {
   const provider = getProviderFromModel(config.model)
+  const modelInfo = getModelInfo(config.model)
+  const caps: number[] = []
 
+  // === 通用规则：同厂降级检测 ===
+  const tierDiff = results.find((result) => result.detectorName === 'tier-differentiation')
+  const tokenAccuracy = results.find((result) => result.detectorName === 'token-accuracy')
+
+  // 档位区分检测严重失败：封顶 49（suspicious）
+  if (modelInfo?.tier === 'flagship' && tierDiff && tierDiff.status === 'fail' && isPoorResult(tierDiff, 0.35)) {
+    caps.push(49)
+  }
+
+  // Token 精确度严重偏离：封顶 59
+  if (tokenAccuracy && tokenAccuracy.status === 'fail' && isPoorResult(tokenAccuracy, 0.3)) {
+    caps.push(59)
+  }
+
+  // 交叉验证：thinking + reasoning + tier-differentiation 三者中2个指向降级
+  if (modelInfo?.tier === 'flagship') {
+    const thinking = results.find((result) => result.detectorName === 'thinking-block')
+    const reasoning = results.find((result) => result.detectorName === 'reasoning-benchmark')
+    let downgradeCount = 0
+    if (isPoorResult(tierDiff, 0.4)) downgradeCount++
+    if (isPoorResult(reasoning, 0.4)) downgradeCount++
+    if (isPoorResult(thinking, 0.4)) downgradeCount++
+    if (downgradeCount >= 2) {
+      caps.push(69)
+    }
+  }
+
+  // === Anthropic 专属规则 ===
   if (provider === 'anthropic') {
     const magic = results.find((result) => result.detectorName === 'magic-string')
     const thinking = results.find((result) => result.detectorName === 'thinking-block')
     const sysPrompt = results.find((result) => result.detectorName === 'system-prompt-probe')
 
-    // 系统提示词探针暴露伪装时，直接封顶到极低分
     if (sysPrompt && sysPrompt.status === 'fail' && sysPrompt.score === 0) {
-      return 29
+      caps.push(29)
     }
 
-    // Claude 真伪最依赖魔术字符串和 thinking/推理块。
-    // 两个核心证据都弱时，不能让身份自报、风格、延迟把总分抬成高可信。
     if (isPoorResult(magic, 0.6) && isPoorResult(thinking, 0.6)) {
-      return 59
+      caps.push(59)
     }
   }
 
+  // === OpenAI 专属规则 ===
   if (provider === 'openai') {
     const metadata = results.find((result) => result.detectorName === 'metadata')
     const authenticity = results.find((result) => result.detectorName === 'provider-authenticity')
     const responses = results.find((result) => result.detectorName === 'openai-responses-fingerprint')
     const sysPrompt = results.find((result) => result.detectorName === 'system-prompt-probe')
 
-    // 系统提示词探针暴露伪装时，直接封顶到极低分
     if (sysPrompt && sysPrompt.status === 'fail' && sysPrompt.score === 0) {
-      return 29
+      caps.push(29)
     }
 
     if (isPoorResult(metadata, 0.55) && isPoorResult(authenticity, 0.55)) {
-      return 59
+      caps.push(59)
     }
 
-    // OpenAI 兼容响应结构和行为题都容易被中转层模拟；如果官方能力指纹
-    // 与 Responses API 指纹同时弱，不能让身份自报和推理题把总分抬成高可信。
     if (isPoorResult(authenticity, 0.55) && isPoorResult(responses, 0.55)) {
-      return 59
+      caps.push(59)
     }
   }
 
-  return null
+  return caps.length > 0 ? Math.min(...caps) : null
 }
 
 function computeSignalCap(signals: AuthenticitySignal[]): number | null {

@@ -10,11 +10,17 @@ export interface AnthropicResponse {
   raw: Response
 }
 
+export interface AnthropicSystemBlock {
+  type: 'text'
+  text: string
+  cache_control?: { type: 'ephemeral' }
+}
+
 export interface AnthropicMessageParams {
   model: string
   messages: Array<{ role: string; content: string }>
   max_tokens: number
-  system?: string
+  system?: string | AnthropicSystemBlock[]
   temperature?: number
   stream?: boolean
   thinking?: { type: string; budget_tokens: number }

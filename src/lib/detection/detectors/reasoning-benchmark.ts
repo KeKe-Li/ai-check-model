@@ -1,23 +1,29 @@
 import { BaseDetector } from './base'
-import type { DetectorResult, VerificationConfig } from '../types'
+import type { AuthenticitySignal, DetectorResult, VerificationConfig } from '../types'
+import { getModelInfo } from '../types'
 import { SmartClient } from '@/lib/api-client/smart-client'
 import {
   BENCHMARK_QUESTION_POOL,
-  BENCHMARK_SAMPLE_SIZE,
   sampleQuestions,
+  instantiateQuestion,
 } from '../constants/benchmark-questions'
-import type { BenchmarkQuestion } from '../constants/benchmark-questions'
+import type { BenchmarkQuestion, AnyBenchmarkQuestion } from '../constants/benchmark-questions'
 
 /**
- * 推理基准检测器
- * 使用已知正确答案的困难问题测试模型的真实推理能力
- * 真正的高端模型（如 Opus 4.6）能正确回答这些问题，而廉价替代模型通常会给出错误答案
+ * 推理基准检测器（增强版）
+ *
+ * 根据声称模型档位选择对应难度的题目：
+ * - flagship: 至少包含2道 hard 题
+ * - mid: 至少包含1道 hard 题
+ * - low: 以 easy/medium 为主
+ *
+ * 如果声称旗舰模型但 hard 题全部答错，产生 critical 降级信号。
  */
 export class ReasoningBenchmarkDetector extends BaseDetector {
   readonly name = 'reasoning-benchmark'
   readonly displayName = '推理能力基准测试'
   readonly maxScore = 15
-  readonly description = '使用高难度推理题测试模型真实能力，并对比已知正确答案'
+  readonly description = '使用梯度难度推理题测试模型真实能力，检测同厂降级'
 
   supports(): boolean {
     return true
@@ -25,36 +31,86 @@ export class ReasoningBenchmarkDetector extends BaseDetector {
 
   async detect(config: VerificationConfig, onProgress: (message: string) => void): Promise<DetectorResult> {
     const findings: string[] = []
+    const signals: AuthenticitySignal[] = []
     let score = 0
 
     try {
       const client = new SmartClient(config.endpoint, config.apiKey, config.apiFormat ?? 'openai')
+      const modelInfo = getModelInfo(config.model)
+      const claimedTier = modelInfo?.tier ?? 'mid'
 
-      // 从题库随机抽题（参数化题目会实例化为具体数值）
-      const selectedQuestions = sampleQuestions(BENCHMARK_QUESTION_POOL, BENCHMARK_SAMPLE_SIZE)
+      // 根据声称档位智能选题
+      const selectedQuestions = this.selectQuestionsByTier(claimedTier)
 
-      // 每道题分配的分数
       const scorePerQuestion = Math.floor(this.maxScore / selectedQuestions.length)
       const remainingScore = this.maxScore - scorePerQuestion * selectedQuestions.length
+
+      let hardCorrect = 0
+      let hardTotal = 0
 
       for (let i = 0; i < selectedQuestions.length; i++) {
         const question = selectedQuestions[i]
         const questionMaxScore = scorePerQuestion + (i === 0 ? remainingScore : 0)
 
-        onProgress(`正在测试推理题 ${i + 1}/${selectedQuestions.length}: ${question.id}...`)
+        onProgress(`正在测试推理题 ${i + 1}/${selectedQuestions.length}: ${question.id} (${question.difficulty})...`)
 
         const result = await this.testQuestion(client, config.model, question, questionMaxScore)
         score += result.score
         findings.push(...result.findings)
+
+        if (question.difficulty === 'hard') {
+          hardTotal++
+          if (result.score >= questionMaxScore * 0.5) hardCorrect++
+        }
       }
 
-      if (score >= this.maxScore * 0.8) {
-        return this.pass(score, findings, { questionsCount: selectedQuestions.length })
+      // 档位降级信号判断
+      if (claimedTier === 'flagship' && hardTotal >= 2 && hardCorrect === 0) {
+        signals.push({
+          id: 'reasoning-flagship-hard-fail',
+          severity: 'critical',
+          polarity: 'negative',
+          message: `声称旗舰但 ${hardTotal} 道 hard 题全部答错，推理能力远低于旗舰档位预期`,
+          evidence: { claimedTier, hardCorrect, hardTotal },
+        })
+        findings.push(`档位预警: 声称旗舰模型但 ${hardTotal} 道困难题全部答错 — 疑似同厂降级`)
+      } else if (claimedTier === 'flagship' && hardTotal >= 2 && hardCorrect >= Math.ceil(hardTotal * 0.5)) {
+        signals.push({
+          id: 'reasoning-flagship-hard-pass',
+          severity: 'strong',
+          polarity: 'positive',
+          message: `旗舰档位 hard 题通过率 ${hardCorrect}/${hardTotal}，符合旗舰模型推理能力`,
+        })
       }
-      return this.fail(score, findings, { questionsCount: selectedQuestions.length })
+
+      const details = { questionsCount: selectedQuestions.length, claimedTier, hardCorrect, hardTotal, authenticitySignals: signals }
+
+      if (score >= this.maxScore * 0.8) {
+        return this.pass(score, findings, details)
+      }
+      return this.fail(score, findings, details)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       return this.skip(`推理基准检测无法执行: ${message}`)
+    }
+  }
+
+  /** 根据声称档位选择合适难度的题目 */
+  private selectQuestionsByTier(tier: 'flagship' | 'mid' | 'low'): BenchmarkQuestion[] {
+    const hardPool = BENCHMARK_QUESTION_POOL.filter(q => q.difficulty === 'hard')
+    const mediumPool = BENCHMARK_QUESTION_POOL.filter(q => q.difficulty === 'medium')
+    const easyPool = BENCHMARK_QUESTION_POOL.filter(q => q.difficulty === 'easy')
+
+    const pick = (pool: AnyBenchmarkQuestion[], n: number) =>
+      sampleQuestions(pool, Math.min(n, pool.length))
+
+    switch (tier) {
+      case 'flagship':
+        return [...pick(hardPool, 2), ...pick(mediumPool, 1)]
+      case 'mid':
+        return [...pick(hardPool, 1), ...pick(mediumPool, 1), ...pick(easyPool, 1)]
+      case 'low':
+        return [...pick(mediumPool, 2), ...pick(easyPool, 1)]
     }
   }
 

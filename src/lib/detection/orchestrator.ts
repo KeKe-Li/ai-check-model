@@ -18,6 +18,12 @@ import { ReasoningBenchmarkDetector } from './detectors/reasoning-benchmark'
 import { LatencyProfileDetector } from './detectors/latency-profile'
 import { SystemPromptProbeDetector } from './detectors/system-prompt-probe'
 import { DeterministicConsistencyDetector } from './detectors/deterministic-consistency'
+import { TokenAccuracyDetector } from './detectors/token-accuracy'
+import { TierDifferentiationDetector } from './detectors/tier-differentiation'
+import { ErrorFingerprintDetector } from './detectors/error-fingerprint'
+import { RateLimitFingerprintDetector } from './detectors/rate-limit-fingerprint'
+import { StreamingPatternDetector } from './detectors/streaming-pattern'
+import { StealthProbeDetector } from './detectors/stealth-probe'
 
 /**
  * 检测编排器
@@ -42,6 +48,12 @@ export class DetectionOrchestrator {
       new OutputFormatDetector(),
       new ReasoningBenchmarkDetector(),
       new LatencyProfileDetector(),
+      new TokenAccuracyDetector(),
+      new TierDifferentiationDetector(),
+      new ErrorFingerprintDetector(),
+      new RateLimitFingerprintDetector(),
+      new StreamingPatternDetector(),
+      new StealthProbeDetector(),
     ]
   }
 
