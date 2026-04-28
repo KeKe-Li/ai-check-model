@@ -125,14 +125,24 @@ export type ModelProvider = 'anthropic' | 'openai' | 'gemini'
  * 模型信息结构
  * 定义支持的 AI 模型及其能力
  */
+/**
+ * 模型档位
+ * flagship: 旗舰模型（Opus、GPT-5.5、o3）
+ * mid: 中端模型（Sonnet、GPT-4o、Gemini Pro）
+ * low: 低端模型（Haiku、GPT-5.4 mini、Gemini Flash）
+ */
+export type ModelTier = 'flagship' | 'mid' | 'low'
+
 export interface ModelInfo {
   id: string
   name: string
   provider: ModelProvider
+  tier: ModelTier
   knowledgeCutoff: string
   supportsThinking: boolean
   supportsLogprobs: boolean
   supportsStreaming: boolean
+  supportsCaching: boolean
   group: string
 }
 
@@ -146,50 +156,60 @@ export const SUPPORTED_MODELS: ModelInfo[] = [
     id: 'claude-opus-4-7',
     name: 'Claude Opus 4.7',
     provider: 'anthropic',
+    tier: 'flagship',
     knowledgeCutoff: '2025-05',
     supportsThinking: true,
     supportsLogprobs: false,
     supportsStreaming: true,
+    supportsCaching: true,
     group: 'Claude',
   },
   {
     id: 'claude-opus-4-6',
     name: 'Claude Opus 4.6',
     provider: 'anthropic',
+    tier: 'flagship',
     knowledgeCutoff: '2025-05',
     supportsThinking: true,
     supportsLogprobs: false,
     supportsStreaming: true,
+    supportsCaching: true,
     group: 'Claude',
   },
   {
     id: 'claude-sonnet-4-6',
     name: 'Claude Sonnet 4.6',
     provider: 'anthropic',
+    tier: 'mid',
     knowledgeCutoff: '2025-05',
     supportsThinking: true,
     supportsLogprobs: false,
     supportsStreaming: true,
+    supportsCaching: true,
     group: 'Claude',
   },
   {
     id: 'claude-haiku-4-5-20251001',
     name: 'Claude Haiku 4.5',
     provider: 'anthropic',
+    tier: 'low',
     knowledgeCutoff: '2025-04',
     supportsThinking: true,
     supportsLogprobs: false,
     supportsStreaming: true,
+    supportsCaching: true,
     group: 'Claude',
   },
   {
     id: 'claude-sonnet-4-20250514',
     name: 'Claude Sonnet 4',
     provider: 'anthropic',
+    tier: 'mid',
     knowledgeCutoff: '2025-03',
     supportsThinking: true,
     supportsLogprobs: false,
     supportsStreaming: true,
+    supportsCaching: true,
     group: 'Claude',
   },
   // GPT 系列
@@ -197,50 +217,60 @@ export const SUPPORTED_MODELS: ModelInfo[] = [
     id: 'gpt-5.5',
     name: 'GPT-5.5',
     provider: 'openai',
+    tier: 'flagship',
     knowledgeCutoff: '2025-12',
     supportsThinking: true,
     supportsLogprobs: false,
     supportsStreaming: true,
+    supportsCaching: false,
     group: 'OpenAI',
   },
   {
     id: 'gpt-5.4',
     name: 'GPT-5.4',
     provider: 'openai',
+    tier: 'mid',
     knowledgeCutoff: '2025-08',
     supportsThinking: true,
     supportsLogprobs: false,
     supportsStreaming: true,
+    supportsCaching: false,
     group: 'OpenAI',
   },
   {
     id: 'gpt-5.4-mini',
     name: 'GPT-5.4 mini',
     provider: 'openai',
+    tier: 'low',
     knowledgeCutoff: '2025-08',
     supportsThinking: true,
     supportsLogprobs: false,
     supportsStreaming: true,
+    supportsCaching: false,
     group: 'OpenAI',
   },
   {
     id: 'gpt-4o',
     name: 'GPT-4o',
     provider: 'openai',
+    tier: 'mid',
     knowledgeCutoff: '2024-10',
     supportsThinking: false,
     supportsLogprobs: true,
     supportsStreaming: true,
+    supportsCaching: false,
     group: 'OpenAI',
   },
   {
     id: 'o3',
     name: 'o3',
     provider: 'openai',
+    tier: 'flagship',
     knowledgeCutoff: '2024-10',
     supportsThinking: true,
     supportsLogprobs: false,
     supportsStreaming: true,
+    supportsCaching: false,
     group: 'OpenAI',
   },
   // Gemini 系列
@@ -248,30 +278,36 @@ export const SUPPORTED_MODELS: ModelInfo[] = [
     id: 'gemini-3.1-pro-preview',
     name: 'Gemini 3.1 Pro',
     provider: 'gemini',
+    tier: 'flagship',
     knowledgeCutoff: '2025-06',
     supportsThinking: true,
     supportsLogprobs: false,
     supportsStreaming: true,
+    supportsCaching: false,
     group: 'Google',
   },
   {
     id: 'gemini-3-flash',
     name: 'Gemini 3 Flash',
     provider: 'gemini',
+    tier: 'low',
     knowledgeCutoff: '2025-03',
     supportsThinking: true,
     supportsLogprobs: false,
     supportsStreaming: true,
+    supportsCaching: false,
     group: 'Google',
   },
   {
     id: 'gemini-2.5-pro',
     name: 'Gemini 2.5 Pro',
     provider: 'gemini',
+    tier: 'mid',
     knowledgeCutoff: '2025-01',
     supportsThinking: true,
     supportsLogprobs: false,
     supportsStreaming: true,
+    supportsCaching: false,
     group: 'Google',
   },
 ]
