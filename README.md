@@ -148,6 +148,7 @@ If you discover new effective detection methods, feel free to contribute them as
 ## Acknowledgments
 
 Detection methods are inspired by community members at [linux.do](https://linux.do/), including but not limited to:
+
 - Magic string refusal test
 - Chinese quotation mark detection
 - Combinatorics math problem / color blindness riddle verification
